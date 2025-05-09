@@ -243,10 +243,10 @@
 
         // Game settings
         const playerSpeed = 5;
-        const gravity = 0.8; 
-        const jumpPower = 20; // MODIFIED: Increased from 15 to 20 for higher jumps
-        const GAME_ORIGINAL_WIDTH = 800; 
-        const GAME_ORIGINAL_HEIGHT = 600; 
+        const gravity = 0.8; // Might need slight adjustment for perceived speed with scaling
+        const jumpPower = 15; // Same here
+        const GAME_ORIGINAL_WIDTH = 800; // NEW
+        const GAME_ORIGINAL_HEIGHT = 600; // NEW
 
         // Player state
         let playerX, playerY;
@@ -259,7 +259,7 @@
         let gameActive = true;
         let currentLevelIndex = 0;
 
-        const levels = [ 
+        const levels = [ /* ... (SAME LEVEL DATA AS PREVIOUSLY - TRUNCATED FOR BREVITY) ... */
             { // Level 1
                 name: "Appetizer Alley", playerStart: { x: 50, y: GAME_ORIGINAL_HEIGHT - 50 - player.offsetHeight },
                 platforms: [
@@ -318,14 +318,17 @@
             const wrapperWidth = gameContainerWrapper.offsetWidth;
             const wrapperHeight = gameContainerWrapper.offsetHeight;
 
-            let scaleX = wrapperWidth / GAME_ORIGINAL_WIDTH;
-            let scaleY = wrapperHeight / GAME_ORIGINAL_HEIGHT;
+            const scaleX = wrapperWidth / GAME_ORIGINAL_WIDTH;
+            const scaleY = wrapperHeight / GAME_ORIGINAL_HEIGHT;
 
-            let scale = Math.min(scaleX, scaleY);
+            const scale = Math.min(scaleX, scaleY);
 
             if (scale < 0.1) scale = 0.1; // Minimum scale to prevent it from disappearing
 
             gameArea.style.transform = `scale(${scale})`;
+            // Adjust player physics if needed, or accept that jumps will feel different
+            // For simplicity, we're not adjusting physics here, but it's a consideration
+            // e.g., gravity *= scale; jumpPower *= scale; (would need careful reset on resize)
         }
 
 
@@ -341,7 +344,7 @@
             playerX = levelData.playerStart.x;
             playerY = levelData.playerStart.y;
             playerVelocityX = 0; playerVelocityY = 0;
-            isJumping = false; isOnGround = true; 
+            isJumping = false; isOnGround = true; // Assume starting on ground for most levels
             player.style.left = playerX + 'px';
             player.style.top = playerY + 'px';
 
@@ -412,35 +415,33 @@
         }
 
         function gameLoop() {
-            if (gameActive) { 
+            if (gameActive) { // Only run game logic if active
                 handleInput();
                 playerVelocityY += gravity;
                 playerX += playerVelocityX;
                 playerY += playerVelocityY;
                 isOnGround = false;
 
+                // Platform collisions (use GAME_ORIGINAL_WIDTH/HEIGHT for these checks)
                 dynamicElementsContainer.querySelectorAll('.platform').forEach(platformEl => {
                     const platformRect = { x: platformEl.offsetLeft, y: platformEl.offsetTop, width: platformEl.offsetWidth, height: platformEl.offsetHeight };
                     const playerRect = { x: playerX, y: playerY, width: player.offsetWidth, height: player.offsetHeight };
 
                     if (checkCollision(playerRect, platformEl)) {
-                        // Check if collision is primarily from top (landing)
                         if (playerVelocityY > 0 && (playerRect.y + playerRect.height - playerVelocityY) <= platformRect.y) {
                             playerY = platformRect.y - player.offsetHeight;
                             playerVelocityY = 0; isJumping = false; isOnGround = true;
-                        // Check if collision is primarily from bottom (hitting head)
                         } else if (playerVelocityY < 0 && (playerRect.y - playerVelocityY) >= (platformRect.y + platformRect.height)) {
-                            playerY = platformRect.y + platformRect.height; playerVelocityY = 0.1; // Stop upward movement, slight downward push
-                        // Check if collision is primarily from left (hitting side)
+                            playerY = platformRect.y + platformRect.height; playerVelocityY = 0;
                         } else if (playerVelocityX > 0 && (playerRect.x + playerRect.width - playerVelocityX) <= platformRect.x) {
                             playerX = platformRect.x - player.offsetWidth; playerVelocityX = 0;
-                        // Check if collision is primarily from right (hitting side)
                         } else if (playerVelocityX < 0 && (playerRect.x - playerVelocityX) >= (platformRect.x + platformRect.width)) {
                             playerX = platformRect.x + platformRect.width; playerVelocityX = 0;
                         }
                     }
                 });
 
+                // Collectible collisions
                 dynamicElementsContainer.querySelectorAll('.collectible:not(.collected)').forEach(collectibleEl => {
                     const playerRectForCollectible = { x: playerX, y: playerY, width: player.offsetWidth, height: player.offsetHeight };
                     if (checkCollision(playerRectForCollectible, collectibleEl)) {
@@ -454,32 +455,32 @@
                                 );
                             } else {
                                 const discountCode = "KOPI3WINNER20";
-                                showMessage( `Congratulations! You Beat All ${TOTAL_LEVELS} Levels!`, `Show this screen at Kopi Tiga for a 20% discount! Code: ${discountCode}`, "Awesome!", '#DAA520', 
+                                showMessage( `Congratulations! You Beat All ${TOTAL_LEVELS} Levels!`, `Show this screen at Kopi Tiga for a 20% discount! Code: ${discountCode}`, "Awesome!", '#DAA520', // Gold color
                                     () => { /* Game ends or offer restart */ }
                                 );
                             }
-                            return; 
+                            return; // Exit early for this frame
                         }
                     }
                 });
 
+                // Boundary checks (use GAME_ORIGINAL_WIDTH/HEIGHT)
                 if (playerX < 0) playerX = 0;
                 if (playerX + player.offsetWidth > GAME_ORIGINAL_WIDTH) playerX = GAME_ORIGINAL_WIDTH - player.offsetWidth;
-                if (playerY > GAME_ORIGINAL_HEIGHT) { 
+                if (playerY > GAME_ORIGINAL_HEIGHT) { // Fell off bottom
                     gameActive = false;
                     showMessage( "Oops! Fell off the plate!", "Don't worry, give it another try!", "Restart Level", '#B22222',
                         () => { setupLevel(currentLevelIndex); gameActive = true; }
                     );
-                    return; 
+                    return; // Exit early
                 }
-                // Simplified ceiling check: if player is above screen top and moving up, stop them.
-                if (playerY < 0 && playerVelocityY < 0) { 
-                    playerY = 0; playerVelocityY = 0.1; // Stop upward movement and push down slightly
+                if (playerY < 0 && !levels[currentLevelIndex].platforms.some(p => p.y < player.offsetHeight && p.y + p.height > 0)) { // hit ceiling without platform
+                    playerY = 0; playerVelocityY = 0.1;
                 }
 
                 player.style.left = playerX + 'px';
                 player.style.top = playerY + 'px';
-            } 
+            } // End if(gameActive)
             requestAnimationFrame(gameLoop);
         }
 
@@ -491,7 +492,7 @@
             gameLoop();
         });
         window.addEventListener('resize', scaleGameArea);
-        window.addEventListener('orientationchange', scaleGameArea); 
+        window.addEventListener('orientationchange', scaleGameArea); // For mobile orientation changes
 
     </script>
 </body>
